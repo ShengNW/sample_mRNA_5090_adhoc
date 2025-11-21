@@ -38,3 +38,16 @@ Makefile
 - `calc_mfe.py` 依赖本机可执行的 `RNAfold`（ViennaRNA）。
 - `scan_rbp_fimo.py` 依赖 MEME Suite 的 `fimo` 命令及一个 PWM/MEME motif 集合。
 - 所有绘图使用 matplotlib，默认保存为 `figs/outputs/*.png` 与 `*.svg`。
+
+## 单组织 GPU 端一键跑通（Liver, organ_id=35）
+在 5090 GPU 机器的仓库根目录：
+```
+# 逐步执行
+make organ35_liver_m1_m2_m3       # M1/M2/M3 训练 + 采样 + 打分，产出 data/raw/m*_scored.organ35_liver.csv
+make organ35_liver_build_tables   # 生成 data/raw/predict_eval.organ35_liver.csv 与 generated_topk.organ35_liver.csv
+make organ35_liver_single_story   # 生成 score 分布图与 top-20 CSV
+
+# 或直接一键
+bash run_single_organ_gpu.sh 35 Liver
+```
+生成的 log 位于 `logs/organ35_liver_gpu_*.log`，同步到 CPU 机器请设置 `CPU_HOST`/`CPU_PATH` 后执行 `bash tools/sync_to_cpu.sh 35 Liver`。

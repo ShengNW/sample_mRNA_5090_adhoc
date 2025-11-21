@@ -1,5 +1,5 @@
 
-import argparse, shutil, subprocess, sys
+import argparse, os, shutil, subprocess, sys
 from pathlib import Path
 import numpy as np, pandas as pd, random, yaml
 from tqdm import trange
@@ -43,7 +43,8 @@ def sample_seed_pairs(n, L5, L3, organ, rng):
     return [(rnd(L5), rnd(L3), organ) for _ in range(n)]
 
 def score_batch(tmp_csv: str, cfg_path: str, out_csv: str) -> pd.DataFrame:
-    cmd = [sys.executable, "-m", "src.side.predict", "--config", cfg_path, "--input", tmp_csv, "--out", out_csv]
+    python_bin = os.environ.get("PYTHON_BIN") or "/root/miniconda3/bin/python" or sys.executable
+    cmd = [python_bin, "-m", "src.side.predict", "--config", cfg_path, "--input", tmp_csv, "--out", out_csv]
     subprocess.run(cmd, check=True)
     return pd.read_csv(out_csv)
 

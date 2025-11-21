@@ -81,3 +81,13 @@ configs/*.yaml
 !configs/m2_cgan.yaml
 !configs/m3_rl.yaml
 !configs/m2_cvae.yaml
+# ==== Ignore generated figs ====
+figs/outputs*/
+figs/outputs_*/
+figs/*/metrics.json
+figs/*/predict_eval_merged.csv
+figs/*.png
+figs/*.svg
+figs/**/*.png
+figs/**/*.svg
+

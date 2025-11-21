@@ -106,13 +106,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/m2_cgan.yaml")
     ap.add_argument("--seed_csv", default="outputs/phase2/m1/m1_topk.csv")
+    ap.add_argument("--out-dir", default=None, help="Override output directory")
+    ap.add_argument("--num-organs", type=int, default=None, help="Override num organs for embeddings")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config, "r"))
-    out = Path(cfg["io"]["out_dir"]); out.mkdir(parents=True, exist_ok=True)
+    out = Path(args.out_dir or cfg["io"]["out_dir"]); out.mkdir(parents=True, exist_ok=True)
 
     L5=cfg["arch"]["max_len_utr5"]; L3=cfg["arch"]["max_len_utr3"]
     df = pd.read_csv(args.seed_csv)
-    num_organs = int(df["organ_id"].max())+1 if "organ_id" in df.columns else 32
+    if args.num_organs is not None:
+        num_organs = int(args.num_organs)
+    else:
+        num_organs = int(df["organ_id"].max())+1 if "organ_id" in df.columns else 32
     ds = SeedPairs(df, L5, L3)
     dl = DataLoader(ds, batch_size=cfg["train"]["batch_size"], shuffle=True, num_workers=2, pin_memory=torch.cuda.is_available())
 
@@ -162,7 +167,9 @@ def main():
             lossG.backward()
             optG.step()
         tau = max(tau_end, tau*0.95)
-        torch.save(G.state_dict(), out/f"cganG_epoch{epoch+1}.pt")
+        ckpt = out / f"cganG_epoch{epoch+1}.pt"
+        torch.save(G.state_dict(), ckpt)
+        (out / "cganG_latest.pt").write_bytes(ckpt.read_bytes())
     print(f"[CGAN] Done. Weights under {out}")
 
 if __name__ == "__main__":

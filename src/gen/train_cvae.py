@@ -33,16 +33,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/m2_cvae.yaml")
     ap.add_argument("--train_csv", default="outputs/phase2/m1/m1_topk.csv")
+    ap.add_argument("--out-dir", default=None, help="Override output directory")
+    ap.add_argument("--num-organs", type=int, default=None, help="Override num organs for embeddings")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config, "r"))
-    out_dir = Path(cfg["io"]["out_dir"]); out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(args.out_dir or cfg["io"]["out_dir"]); out_dir.mkdir(parents=True, exist_ok=True)
 
     L5 = cfg["arch"]["max_len_utr5"]; L3 = cfg["arch"]["max_len_utr3"]
     df = pd.read_csv(args.train_csv)
     ds = SeqPairs(df, L5, L3)
     dl = DataLoader(ds, batch_size=cfg["train"]["batch_size"], shuffle=True, num_workers=2)
 
-    num_organs = int(df["organ_id"].max())+1 if "organ_id" in df.columns else 32
+    if args.num_organs is not None:
+        num_organs = int(args.num_organs)
+    else:
+        num_organs = int(df["organ_id"].max())+1 if "organ_id" in df.columns else 32
     mcfg = CVAEConfig(max_len_utr5=L5, max_len_utr3=L3, latent_dim=cfg["arch"]["latent_dim"], hidden=cfg["arch"]["hidden"],
                       num_layers=cfg["arch"]["num_layers"], num_organs=num_organs)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -57,7 +62,9 @@ def main():
             loss, recon, kl, _ = model(xb, org, beta=beta)
             opt.zero_grad(); loss.backward(); opt.step()
             global_step += 1
-        torch.save(model.state_dict(), out_dir/f"cvae_epoch{epoch+1}.pt")
+        ckpt = out_dir / f"cvae_epoch{epoch+1}.pt"
+        torch.save(model.state_dict(), ckpt)
+        (out_dir / "cvae_latest.pt").write_bytes(ckpt.read_bytes())
     print(f"[CVAE] Done. Weights under {out_dir}")
 
 if __name__ == "__main__":

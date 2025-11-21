@@ -104,10 +104,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/m3_rl.yaml")
     ap.add_argument("--predict-config", default="configs/gen_predict.yaml")
+    ap.add_argument("--out-dir", default=None, help="Override output directory for checkpoints/samples")
+    ap.add_argument("--target-organ", type=int, default=None, help="Override target organ id")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(open(args.config, "r"))
-    out_dir = Path(cfg["io"]["out_dir"])
+    out_dir = Path(args.out_dir or cfg["io"]["out_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
 
     seed = int(cfg.get("seed", 42))
@@ -136,13 +138,17 @@ def main() -> None:
 
     batch_size = max(1, int(cfg["train"].get("batch_size", 1)))
     total_steps = int(cfg["train"]["steps"])
-    target = int(cfg["env"]["target_organ"])
+    target = int(args.target_organ if args.target_organ is not None else cfg["env"]["target_organ"])
 
     scorer = SidePredictor(args.predict_config)
 
     steps_done = 0
     pbar = tqdm(total=total_steps, desc="RL")
     organ_full = torch.full((batch_size,), target, dtype=torch.long, device=device)
+
+    samples_path = out_dir / "samples.csv"
+    if not samples_path.exists():
+        samples_path.write_text("utr5,utr3,organ_id,reward\n")
 
     while steps_done < total_steps:
         cur_bs = min(batch_size, total_steps - steps_done)
@@ -171,7 +177,7 @@ def main() -> None:
             steps_done += 1
             pbar.update(1)
             if steps_done % 1000 == 0:
-                with open(out_dir / "samples.csv", "a") as fh:
+                with open(samples_path, "a") as fh:
                     fh.write(f"{seq5[i]},{seq3[i]},{target},{rewards[i].item()}\n")
 
     torch.save(policy.state_dict(), out_dir / "ppo_final.pt")
