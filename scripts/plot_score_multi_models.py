@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -92,13 +93,20 @@ def _resolve_organ_name(root: Path, organ_id: int | None) -> str | None:
 
 
 def main():
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--organ-id", type=int, default=None)
+    ap.add_argument("--organ-name", type=str, default=None)
+    args = ap.parse_args()
+
     root = Path(__file__).resolve().parents[1]
     raw_dir = root / "data" / "raw"
     fig_dir = root / "figs" / "outputs"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
-    organ_id = 0
-    organ_name = _resolve_organ_name(root, organ_id)
+    organ_id = args.organ_id
+    organ_name = args.organ_name or _resolve_organ_name(root, organ_id)
 
     datasets = [
         ("Real (eval)", raw_dir / "predict_eval.csv"),
@@ -142,6 +150,20 @@ def main():
     out_fig = fig_dir / "fig_score_pred_all_models.png"
     plt.savefig(out_fig, dpi=200)
     print(f"[OK] saved figure to {out_fig}")
+
+    # ECDF overlay (distribution shift)
+    plt.figure(figsize=(8, 5))
+    for label, s in all_scores:
+        s_sorted = np.sort(s.values)
+        y = np.linspace(0, 1, len(s_sorted), endpoint=False)
+        plt.step(s_sorted, y, where="post", label=label, linewidth=1.5)
+    plt.xlabel("score_pred (same predictor)")
+    plt.ylabel("ECDF")
+    plt.legend()
+    plt.tight_layout()
+    out_ecdf = fig_dir / "fig_score_pred_all_models_ecdf.png"
+    plt.savefig(out_ecdf, dpi=200)
+    print(f"[OK] saved ECDF to {out_ecdf}")
 
     def summarize(label, s):
         s = s.dropna()
