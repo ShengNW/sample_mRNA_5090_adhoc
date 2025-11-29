@@ -150,6 +150,8 @@ def main() -> None:
     if not samples_path.exists():
         samples_path.write_text("utr5,utr3,organ_id,reward\n")
 
+    traj_rows = []
+
     while steps_done < total_steps:
         cur_bs = min(batch_size, total_steps - steps_done)
         organ_slice = organ_full[:cur_bs]
@@ -173,14 +175,23 @@ def main() -> None:
         loss.backward()
         opt.step()
 
-        for i in range(cur_bs):
-            steps_done += 1
-            pbar.update(1)
-            if steps_done % 1000 == 0:
-                with open(samples_path, "a") as fh:
+        steps_done += cur_bs
+        pbar.update(cur_bs)
+
+        traj_rows.append((steps_done, float(rewards.mean().item()), float(rewards.max().item())))
+
+        if steps_done % 1000 == 0:
+            with open(samples_path, "a") as fh:
+                for i in range(cur_bs):
                     fh.write(f"{seq5[i]},{seq3[i]},{target},{rewards[i].item()}\n")
 
     torch.save(policy.state_dict(), out_dir / "ppo_final.pt")
+    traj_path = out_dir / "traj.csv"
+    with open(traj_path, "w") as fh:
+        fh.write("step,mean_reward,max_reward\n")
+        for s, mean_r, max_r in traj_rows:
+            fh.write(f"{s},{mean_r},{max_r}\n")
+    print(f"[RL] Logged trajectory to {traj_path}")
     print(f"[RL] Done. Saved policy and samples in {out_dir}")
 
 
